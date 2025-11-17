@@ -18,7 +18,7 @@ OUTPUT_JSON = OUTPUT_DIR / "generated_sentences.json"
 # Ollama settings
 OLLAMA_MODEL = "deepseek-r1"
 OLLAMA_HOST = "http://localhost:11434"  # Default Ollama host
-OLLAMA_TIMEOUT = 300  # 5 minutes timeout for generation
+OLLAMA_TIMEOUT = 1200  # 5 minutes timeout for generation
 
 # Generation settings
 DEFAULT_SENTENCES_PER_CATEGORY = 5

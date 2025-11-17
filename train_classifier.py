@@ -77,6 +77,33 @@ def main():
         help="Use 8-bit quantization"
     )
 
+    # Fine-tuning method arguments
+    parser.add_argument(
+        "--use-lora",
+        action="store_true",
+        help="Use LoRA for parameter-efficient fine-tuning (recommended)"
+    )
+
+    parser.add_argument(
+        "--lora-r",
+        type=int,
+        default=8,
+        help="LoRA rank (higher = more parameters, better performance)"
+    )
+
+    parser.add_argument(
+        "--lora-alpha",
+        type=int,
+        default=16,
+        help="LoRA scaling factor"
+    )
+
+    parser.add_argument(
+        "--use-custom-head",
+        action="store_true",
+        help="Use multi-layer classifier head instead of single layer"
+    )
+
     # Training arguments
     parser.add_argument(
         "--epochs",
@@ -148,7 +175,11 @@ def main():
         model_name=args.model_name,
         use_4bit=args.use_4bit,
         use_8bit=args.use_8bit,
-        max_length=args.max_length
+        max_length=args.max_length,
+        use_lora=args.use_lora,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        use_custom_head=args.use_custom_head
     )
 
     training_config = TrainingConfig(
@@ -166,10 +197,18 @@ def main():
     logger.info(f"\n📋 Configuration:")
     logger.info(f"  Model: {model_config.model_name}")
     logger.info(f"  Categories: {', '.join(CATEGORIES)}")
-    logger.info(f"  Epochs: {training_config.num_epochs}")
-    logger.info(f"  Batch size: {training_config.batch_size}")
-    logger.info(f"  Learning rate: {training_config.learning_rate}")
-    logger.info(f"  Max length: {model_config.max_length}")
+    logger.info(f"  Fine-tuning method:")
+    logger.info(f"    - LoRA: {'Yes' if model_config.use_lora else 'No'}")
+    if model_config.use_lora:
+        logger.info(f"    - LoRA rank: {model_config.lora_r}")
+        logger.info(f"    - LoRA alpha: {model_config.lora_alpha}")
+    logger.info(f"    - Custom multi-layer head: {'Yes' if model_config.use_custom_head else 'No'}")
+    logger.info(f"    - Quantization: {('4-bit' if model_config.use_4bit else '8-bit' if model_config.use_8bit else 'None')}")
+    logger.info(f"  Training:")
+    logger.info(f"    - Epochs: {training_config.num_epochs}")
+    logger.info(f"    - Batch size: {training_config.batch_size}")
+    logger.info(f"    - Learning rate: {training_config.learning_rate}")
+    logger.info(f"    - Max length: {model_config.max_length}")
     logger.info(f"  Output dir: {args.output_dir}")
 
     # Create trainer

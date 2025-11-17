@@ -6,6 +6,9 @@ transformers>=4.35.0
 datasets>=2.14.0
 accelerate>=0.24.0
 
+# Parameter-Efficient Fine-Tuning (LoRA/QLoRA)
+peft>=0.7.0
+
 # Quantization (optional, for large models)
 bitsandbytes>=0.41.0
 

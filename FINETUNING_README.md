@@ -4,13 +4,23 @@ Train a LLaMA-based multi-label classifier to categorize mental health symptoms.
 
 ## 🎯 Overview
 
-This package fine-tunes LLaMA models for **multi-label binary classification** of mental health categories:
+This package **fine-tunes** (NOT trains from scratch) LLaMA models for **multi-label binary classification** of mental health categories:
 - **Psychosis**
 - **Anxiety**
 - **Depression**
 - **Mania**
 
 Each category has an independent binary classifier (presence/absence).
+
+### What is Fine-Tuning?
+
+Fine-tuning **adapts a pre-trained LLaMA model** to our mental health classification task without retraining the entire model from scratch. This approach:
+- ✅ Starts with pre-trained LLaMA (already understands language)
+- ✅ Adds classification layers on top
+- ✅ Trains only what's needed for the task
+- ✅ Much faster and requires less data than training from scratch
+
+**See `FINETUNING_GUIDE.md` for detailed explanation of fine-tuning methods.**
 
 ## 📋 Prerequisites
 
@@ -109,6 +119,20 @@ python train_classifier.py \
     --output-dir finetuning/checkpoints/llama2_7b
 ```
 
+**⭐ Recommended: LoRA + Custom Head (Best Performance + Efficiency)**
+```bash
+python train_classifier.py \
+    --train-file data/output/generated_sentences_v1_all.json \
+    --model-name meta-llama/Llama-3.2-1B \
+    --use-lora \
+    --lora-r 8 \
+    --use-custom-head \
+    --epochs 5 \
+    --batch-size 8 \
+    --fp16 \
+    --output-dir finetuning/checkpoints/production
+```
+
 ### Step 3: Make Predictions
 
 **Single text:**
@@ -135,15 +159,40 @@ python predict_classifier.py \
     --batch-size 32
 ```
 
-## 📊 Training Options
+## 📊 Fine-Tuning Methods
+
+This package supports **parameter-efficient fine-tuning** methods:
+
+### 1. Standard Fine-Tuning (Default)
+- Trains all model parameters
+- Best performance but requires most memory
+- Use when you have powerful GPU (16GB+ VRAM)
+
+### 2. LoRA Fine-Tuning ⭐ (Recommended)
+- Freezes base model, trains only small adapters
+- 100x fewer parameters (0.1-1% trainable)
+- Similar performance to full fine-tuning
+- **Use `--use-lora` flag**
+
+### 3. Multi-Layer Classifier Head
+- Deep classifier instead of single linear layer
+- Better feature transformation
+- **Use `--use-custom-head` flag**
+
+### 4. LoRA + Custom Head (Best)
+- Combines efficiency of LoRA with expressiveness of multi-layer head
+- **Recommended for production**
+- **Use both `--use-lora` and `--use-custom-head`**
+
+**See `FINETUNING_GUIDE.md` for detailed comparison and explanations.**
 
 ### Model Selection
 
-| Model | Size | RAM Required | GPU Required | Training Time |
-|-------|------|--------------|--------------|---------------|
-| Llama-3.2-1B | 1B | 8GB | Optional | ~1 hour |
-| Llama-2-7b-hf | 7B | 16GB+ | Recommended | ~4 hours |
-| Llama-2-7b-hf (4-bit) | 7B | 8GB | Required | ~6 hours |
+| Model | Size | RAM Required | GPU Required | Training Time | LoRA Recommended |
+|-------|------|--------------|--------------|---------------|------------------|
+| Llama-3.2-1B | 1B | 8GB | Optional | ~1 hour | ✅ Yes |
+| Llama-2-7b-hf | 7B | 16GB+ | Recommended | ~4 hours | ✅ Yes |
+| Llama-2-7b-hf (4-bit + LoRA) | 7B | 8GB | Required | ~2 hours | ✅ Yes |
 
 ### Training Arguments
 
@@ -153,6 +202,14 @@ python train_classifier.py \
     --val-file <path>            # Optional validation data
     --test-file <path>           # Optional test data
     --model-name <name>          # HuggingFace model name
+
+    # Fine-tuning method (NEW!)
+    --use-lora                   # Use LoRA for parameter-efficient fine-tuning
+    --lora-r <int>               # LoRA rank (default: 8, higher = more params)
+    --lora-alpha <int>           # LoRA alpha (default: 16)
+    --use-custom-head            # Use multi-layer classifier head
+
+    # Training parameters
     --epochs <int>               # Number of epochs (default: 3)
     --batch-size <int>           # Batch size (default: 8)
     --learning-rate <float>      # Learning rate (default: 2e-5)

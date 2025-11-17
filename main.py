@@ -113,7 +113,10 @@ def main():
 
     # Prepare paths
     input_file = Path(args.input) if args.input else config.INPUT_JSON
-    output_file = Path(args.output) if args.output else config.OUTPUT_JSON
+
+    # IMPORTANT: Only set output_file if user explicitly provides it
+    # If None, the versioning system will auto-generate versioned filenames
+    output_file = Path(args.output) if args.output else None
 
     # Determine categories to generate
     categories = None
@@ -129,7 +132,7 @@ def main():
         ollama_host=args.ollama_host,
         model=args.model,
         input_file=input_file,
-        output_file=output_file
+        output_file=config.OUTPUT_JSON  # Set default for generator initialization
     )
 
     # Generate and save
@@ -139,17 +142,18 @@ def main():
     else:
         logger.info("Target categories: ALL")
 
+    # Enable auto-versioning by passing None if user didn't specify output
     success = generator.generate_and_save(
         num_sentences=args.count,
         categories=categories,
-        output_file=output_file,
+        output_file=output_file,  # None if not specified, triggers versioning
         append=args.append
     )
 
     if success:
         logger.info("=" * 80)
         logger.info("Generation completed successfully!")
-        logger.info(f"Output saved to: {output_file}")
+        # Note: The actual output file path is logged by the generator
         logger.info("=" * 80)
         return 0
     else:

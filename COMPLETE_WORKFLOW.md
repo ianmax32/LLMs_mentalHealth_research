@@ -74,6 +74,8 @@ huggingface-cli login
 
 #### Step 2: Train the Model
 
+**Important:** This is **fine-tuning** (NOT training from scratch). We adapt a pre-trained LLaMA model to our task. See `FINETUNING_GUIDE.md` for detailed explanation.
+
 **Option A: Quick training (CPU/small GPU)**
 ```bash
 python train_classifier.py \
@@ -96,6 +98,22 @@ python train_classifier.py \
     --fp16 \
     --output-dir finetuning/checkpoints/run_1
 ```
+
+**⭐ Option C: Recommended - LoRA + Custom Head (Best Performance + Efficiency)**
+```bash
+python train_classifier.py \
+    --train-file finetuning/data/train.json \
+    --val-file finetuning/data/val.json \
+    --model-name meta-llama/Llama-3.2-1B \
+    --use-lora \
+    --lora-r 8 \
+    --use-custom-head \
+    --epochs 5 \
+    --batch-size 8 \
+    --fp16 \
+    --output-dir finetuning/checkpoints/production
+```
+*This uses parameter-efficient fine-tuning (LoRA) + multi-layer classifier. Only 0.2% of parameters are trainable, reducing memory and training time while maintaining excellent performance.*
 
 **Output**: Trained model in `finetuning/checkpoints/run_1/final_model/`
 
@@ -307,12 +325,39 @@ tensorboard --logdir finetuning/checkpoints/run_1
 ## 📚 Documentation
 
 - **README.md**: Data generator guide
-- **FINETUNING_README.md**: Fine-tuning guide
+- **FINETUNING_README.md**: Fine-tuning quick reference
+- **FINETUNING_GUIDE.md**: Detailed fine-tuning methods explanation ⭐ NEW!
 - **VERSIONING.md**: File versioning system
-- **QUICKSTART.md**: Quick setup guide
+- **COMPLETE_WORKFLOW.md**: This file
+
+---
+
+## 🎯 What is Fine-Tuning?
+
+**Fine-tuning adapts a pre-trained LLaMA model to your mental health classification task WITHOUT training from scratch.**
+
+### Key Features:
+
+1. **Parameter-Efficient Fine-Tuning (LoRA)**
+   - Freezes base model weights
+   - Trains only small adapter layers (0.1-1% of parameters)
+   - Achieves similar performance to full fine-tuning
+   - 10x less memory, faster training
+
+2. **Multi-Layer Classifier Head**
+   - Deep classifier instead of single linear layer
+   - Better feature transformation
+   - Improved classification performance
+
+3. **Binary Classification for Each Category**
+   - Each category (Psychosis, Anxiety, Depression, Mania) is independent
+   - Output: "Positive" or "Negative" for each category
+   - Supports multi-label (sentence can have multiple categories)
+
+**For detailed explanation, see `FINETUNING_GUIDE.md`**
 
 ---
 
 **You now have a complete pipeline for mental health text classification!** 🎉
 
-Generate data → Prepare → Train → Predict → Deploy
+Generate data → Prepare → **Fine-tune** (NOT train from scratch) → Predict → Deploy

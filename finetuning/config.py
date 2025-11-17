@@ -44,6 +44,19 @@ class ModelConfig:
     use_4bit: bool = False
     use_8bit: bool = False
 
+    # Parameter-Efficient Fine-Tuning (PEFT) with LoRA
+    use_lora: bool = False  # Enable LoRA for efficient fine-tuning
+    lora_r: int = 8  # LoRA rank (higher = more parameters, better performance)
+    lora_alpha: int = 16  # LoRA scaling factor
+    lora_dropout: float = 0.1
+    lora_target_modules: Optional[List[str]] = None  # Auto-detect if None
+
+    # Custom classifier head (multi-layer)
+    use_custom_head: bool = False  # Use multi-layer classifier instead of single layer
+    classifier_hidden_dims: List[int] = field(default_factory=lambda: [256, 128])  # Hidden layer dimensions
+    classifier_dropout: float = 0.3  # Dropout between classifier layers
+    classifier_activation: str = "relu"  # Activation function: relu, gelu, tanh
+
 
 @dataclass
 class TrainingConfig:
