@@ -50,7 +50,7 @@ huggingface-cli login
 
 Your data should be in JSON format:
 
-**Format 1: Category-based (from data generator)**
+**Format 1: Category-based**
 ```json
 {
   "Psychosis": ["sentence 1", "sentence 2", ...],
