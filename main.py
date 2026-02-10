@@ -58,26 +58,13 @@ def main():
     parser.add_argument(
         "--output",
         type=str,
-        help="Output file path (default: data/output/generated_sentences.json)"
-    )
-
-    parser.add_argument(
-        "--input",
-        type=str,
-        help="Input file path with examples (default: data/input/mental_health_sentences.json)"
+        help="Output file path (default: auto-versioned in data/output/)"
     )
 
     parser.add_argument(
         "--append",
         action="store_true",
         help="Append to existing output file instead of overwriting"
-    )
-
-    parser.add_argument(
-        "--ollama-host",
-        type=str,
-        default=config.OLLAMA_HOST,
-        help=f"Ollama server host (default: {config.OLLAMA_HOST})"
     )
 
     parser.add_argument(
@@ -111,9 +98,6 @@ def main():
         parser.print_help()
         return 1
 
-    # Prepare paths
-    input_file = Path(args.input) if args.input else config.INPUT_JSON
-
     # IMPORTANT: Only set output_file if user explicitly provides it
     # If None, the versioning system will auto-generate versioned filenames
     output_file = Path(args.output) if args.output else None
@@ -129,9 +113,7 @@ def main():
     # Initialize generator
     logger.info(f"Initializing generator with model: {args.model}")
     generator = MentalHealthDataGenerator(
-        ollama_host=args.ollama_host,
         model=args.model,
-        input_file=input_file,
         output_file=config.OUTPUT_JSON  # Set default for generator initialization
     )
 
@@ -153,7 +135,6 @@ def main():
     if success:
         logger.info("=" * 80)
         logger.info("Generation completed successfully!")
-        # Note: The actual output file path is logged by the generator
         logger.info("=" * 80)
         return 0
     else:

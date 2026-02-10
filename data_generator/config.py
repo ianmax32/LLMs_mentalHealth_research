@@ -22,55 +22,41 @@ OLLAMA_TIMEOUT = 1200  # 5 minutes timeout for generation
 
 # Generation settings
 DEFAULT_SENTENCES_PER_CATEGORY = 5
-MIN_SENTENCES = 10
+MIN_SENTENCES = 100
 MAX_SENTENCES = 500
 
-# Prompt template
-PROMPT_TEMPLATE = """[INST]
-Your task is to analyze the provided JSON file, which describes symptoms of various mental health conditions.
+# Static prompt template - only category changes
+PROMPT_TEMPLATE = """You are an expert in mental health symptoms and clinical psychology. Your task is to generate realistic first-person sentences that describe symptoms of {category}.
 
-1. **Identify the categories** of mental health conditions present in the JSON file.
+Generate exactly {num_sentences} unique paragraphs of sentences with a good description of what is happening, that someone experiencing {category} symptoms might say, think or feel. Also try to simulate different tones. Each sentence should:
+- Be written in first person perspective
+- Sound natural and conversational
+- Describe a specific symptom, feeling, or experience related to {category}
+- Vary in tone and severity
 
-2. **For each category**, analyze the provided example sentences and **generate {num_sentences} new sentences** that could also be indicative of that particular condition.
-
-**Example JSON File:**
-
-{example_json}
-
-**Output:**
-
-Present your findings in a structured format, where each key represents a category and the corresponding value is a list of {num_sentences} generated sentences for that category.
-
-For example:
-
-```json
+Return ONLY a valid JSON object with this exact format:
 {{
-  "Mood Disorders": [
-    "I feel a deep sense of emptiness and hopelessness.",
-    "I have lost all interest in things I used to enjoy.",
-    "I experience significant changes in my appetite and sleep patterns.",
-    "I have difficulty concentrating and making decisions.",
-    "I feel guilty and worthless most of the time."
-  ],
-  "Anxiety Disorders": [
-    "I experience frequent and intense feelings of worry and nervousness.",
-    "I have difficulty relaxing and often feel on edge.",
-    "I avoid social situations due to fear of judgment or embarrassment.",
-    "I experience physical symptoms such as sweating, trembling, and rapid heartbeat.",
-    "I have intrusive thoughts that I cannot seem to control."
+  "{category}": [
+    "sentence 1",
+    "sentence 2",
+    ...
   ]
 }}
-```
 
-**IMPORTANT**: Return ONLY valid JSON. Do not include any explanatory text before or after the JSON output.
-[/INST]"""
+Do not include any explanatory text, markdown formatting, or code blocks. Output only the raw JSON."""
 
 # Mental health categories
 CATEGORIES = [
     "Psychosis",
     "Anxiety",
     "Depression",
-    "Mania"
+    "Mania",
+    "Bipolar Disorder",
+    "Post-Traumatic Stress Disorder",
+    "Easting Disorder",
+    "Disruptive behavior and dissocial disorders",
+    "Schizophrenia",
+    "Neurodevelopmental disorders"
 ]
 
 # Logging settings

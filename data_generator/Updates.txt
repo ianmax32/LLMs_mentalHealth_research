@@ -1,0 +1,18 @@
+Version 1 Prompt: PROMPT_TEMPLATE = """You are an expert in mental health symptoms and clinical psychology. Your task is to generate realistic first-person sentences that describe symptoms of {category}.
+
+Generate exactly {num_sentences} unique sentences that someone experiencing {category} symptoms might say or think. Each sentence should:
+- Be written in first person perspective
+- Sound natural and conversational
+- Describe a specific symptom, feeling, or experience related to {category}
+- Vary in tone and severity
+
+Return ONLY a valid JSON object with this exact format:
+{{
+  "{category}": [
+    "sentence 1",
+    "sentence 2",
+    ...
+  ]
+}}
+
+Do not include any explanatory text, markdown formatting, or code blocks. Output only the raw JSON."""

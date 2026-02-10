@@ -2,14 +2,14 @@
 
 Comprehensive guide to fine-tuning LLaMA models for mental health classification.
 
-## 🎯 What is Fine-Tuning?
+##  What is Fine-Tuning?
 
 **Fine-tuning** is the process of adapting a pre-trained Large Language Model (like LLaMA) to a specific task or dataset **without retraining the entire model from scratch**.
 
 ### Key Concept
 
-- ✅ **Fine-tuning**: Start with pre-trained LLaMA → Add classification layers → Train on your data
-- ❌ **Training from scratch**: Start with random weights → Train everything from zero
+-  **Fine-tuning**: Start with pre-trained LLaMA → Add classification layers → Train on your data
+-  **Training from scratch**: Start with random weights → Train everything from zero
 
 **Benefits of Fine-tuning:**
 - Much faster (hours vs weeks)

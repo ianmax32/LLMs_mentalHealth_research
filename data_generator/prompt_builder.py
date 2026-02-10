@@ -2,9 +2,8 @@
 Prompt builder for generating mental health sentences
 """
 
-import json
 import logging
-from typing import Dict, List, Optional
+from typing import List
 from . import config
 
 logger = logging.getLogger(__name__)
@@ -22,19 +21,13 @@ class PromptBuilder:
         """
         self.template = template or config.PROMPT_TEMPLATE
 
-    def build_prompt(
-        self,
-        example_data: Dict[str, List[str]],
-        num_sentences: int = None,
-        categories: List[str] = None
-    ) -> str:
+    def build_prompt(self, category: str, num_sentences: int = None) -> str:
         """
-        Build a prompt for sentence generation
+        Build a static prompt for sentence generation - only category changes
 
         Args:
-            example_data: Dictionary of category -> example sentences
-            num_sentences: Number of sentences to generate per category
-            categories: Specific categories to include (None for all)
+            category: Mental health category (Psychosis, Anxiety, Depression, Mania)
+            num_sentences: Number of sentences to generate
 
         Returns:
             Formatted prompt string
@@ -49,79 +42,39 @@ class PromptBuilder:
             logger.warning(f"num_sentences {num_sentences} > maximum {config.MAX_SENTENCES}, using maximum")
             num_sentences = config.MAX_SENTENCES
 
-        # Filter categories if specified
-        if categories:
-            filtered_data = {k: v for k, v in example_data.items() if k in categories}
-            if not filtered_data:
-                logger.error(f"None of the specified categories {categories} found in example data")
-                return ""
-            example_data = filtered_data
-
-        # Format example JSON
-        example_json = json.dumps(example_data, indent=2)
-
-        # Build prompt
+        # Build prompt with only category and num_sentences
         prompt = self.template.format(
-            num_sentences=num_sentences,
-            example_json=example_json
+            category=category,
+            num_sentences=num_sentences
         )
 
-        logger.info(f"Built prompt for {len(example_data)} categories, {num_sentences} sentences each")
+        logger.info(f"Built prompt for category '{category}', {num_sentences} sentences")
         logger.debug(f"Prompt length: {len(prompt)} characters")
 
         return prompt
 
-    def build_category_specific_prompt(
-        self,
-        category: str,
-        examples: List[str],
-        num_sentences: int = None
-    ) -> str:
+    @staticmethod
+    def get_available_categories() -> List[str]:
         """
-        Build a prompt for a specific category
-
-        Args:
-            category: Mental health category name
-            examples: Example sentences for this category
-            num_sentences: Number of sentences to generate
+        Get list of available mental health categories
 
         Returns:
-            Formatted prompt string
+            List of category names
         """
-        example_data = {category: examples}
-        return self.build_prompt(example_data, num_sentences)
+        return config.CATEGORIES.copy()
 
     @staticmethod
-    def validate_example_data(data: Dict[str, List[str]]) -> bool:
+    def validate_category(category: str) -> bool:
         """
-        Validate example data structure
+        Validate if a category is valid
 
         Args:
-            data: Dictionary to validate
+            category: Category name to validate
 
         Returns:
             True if valid, False otherwise
         """
-        if not isinstance(data, dict):
-            logger.error("Example data must be a dictionary")
+        if category not in config.CATEGORIES:
+            logger.error(f"Invalid category '{category}'. Available: {config.CATEGORIES}")
             return False
-
-        for category, sentences in data.items():
-            if not isinstance(category, str):
-                logger.error(f"Category key must be string, got {type(category)}")
-                return False
-
-            if not isinstance(sentences, list):
-                logger.error(f"Category '{category}' must have list of sentences, got {type(sentences)}")
-                return False
-
-            if not sentences:
-                logger.error(f"Category '{category}' has no example sentences")
-                return False
-
-            if not all(isinstance(s, str) for s in sentences):
-                logger.error(f"All sentences in '{category}' must be strings")
-                return False
-
-        logger.info(f"Validated example data with {len(data)} categories")
         return True

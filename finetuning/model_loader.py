@@ -99,7 +99,8 @@ class MentalHealthModelLoader:
     def load_model_and_tokenizer(
         self,
         model_name: Optional[str] = None,
-        cache_dir: Optional[Path] = None
+        cache_dir: Optional[Path] = None,
+        local_model_path: Optional[str] = None
     ):
         """
         Load model and tokenizer with optional LoRA and custom classifier head
@@ -112,16 +113,24 @@ class MentalHealthModelLoader:
         Args:
             model_name: Model name or path (overrides config)
             cache_dir: Cache directory for downloading models
+            local_model_path: Path to local model directory (overrides model_name)
 
         Returns:
             Tuple of (model, tokenizer)
         """
-        model_name = model_name or self.config.model_name
+        # Priority: local_model_path arg > config.local_model_path > model_name arg > config.model_name
+        if local_model_path:
+            model_name = local_model_path
+        elif self.config.local_model_path:
+            model_name = self.config.local_model_path
+        else:
+            model_name = model_name or self.config.model_name
 
         logger.info("=" * 60)
         logger.info("LOADING PRE-TRAINED MODEL FOR FINE-TUNING")
         logger.info("=" * 60)
         logger.info(f"Base model: {model_name}")
+        logger.info(f"Loading from: {'local path' if (local_model_path or self.config.local_model_path) else 'HuggingFace Hub'}")
         logger.info(f"Use LoRA: {self.config.use_lora}")
         logger.info(f"Use custom classifier: {self.config.use_custom_head}")
 
@@ -141,12 +150,16 @@ class MentalHealthModelLoader:
                 load_in_8bit=True
             )
 
+        # Determine if loading from local path
+        is_local = (local_model_path is not None) or (self.config.local_model_path is not None)
+
         # Load tokenizer
         logger.info("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_name,
             cache_dir=cache_dir,
-            trust_remote_code=True
+            trust_remote_code=True,
+            local_files_only=is_local
         )
 
         # Add padding token if not present
@@ -162,7 +175,8 @@ class MentalHealthModelLoader:
                 model_name,
                 quantization_config=quantization_config,
                 cache_dir=cache_dir,
-                trust_remote_code=True
+                trust_remote_code=True,
+                local_files_only=is_local
             )
 
             # Create custom multi-layer classifier
@@ -187,7 +201,8 @@ class MentalHealthModelLoader:
                 label2id=LABEL2ID,
                 quantization_config=quantization_config,
                 cache_dir=cache_dir,
-                trust_remote_code=True
+                trust_remote_code=True,
+                local_files_only=is_local
             )
 
         # Configure model
@@ -355,7 +370,8 @@ class MentalHealthModelLoader:
         config_info = {
             "use_lora": self.config.use_lora,
             "use_custom_head": self.config.use_custom_head,
-            "model_name": self.config.model_name
+            "model_name": self.config.model_name,
+            "local_model_path": self.config.local_model_path
         }
         import json
         with open(output_dir / "training_config.json", "w") as f:

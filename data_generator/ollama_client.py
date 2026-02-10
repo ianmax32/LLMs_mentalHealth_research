@@ -1,10 +1,11 @@
 """
-Ollama client for interacting with the deepseek-r1 model
+Ollama client for interacting with the deepseek-r1 model via command line
 """
 
 import json
 import logging
-import requests
+import subprocess
+import re
 from typing import Dict, Any, Optional
 from . import config
 
@@ -12,21 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 class OllamaClient:
-    """Client for interacting with Ollama API"""
+    """Client for interacting with Ollama via command line"""
 
-    def __init__(self, host: str = None, model: str = None, timeout: int = None):
+    def __init__(self, model: str = None, timeout: int = None):
         """
         Initialize Ollama client
 
         Args:
-            host: Ollama host URL (default from config)
             model: Model name (default from config)
             timeout: Request timeout in seconds (default from config)
         """
-        self.host = host or config.OLLAMA_HOST
         self.model = model or config.OLLAMA_MODEL
         self.timeout = timeout or config.OLLAMA_TIMEOUT
-        self.api_url = f"{self.host}/api/generate"
 
         logger.info(f"Initialized Ollama client with model: {self.model}")
 
@@ -38,79 +36,78 @@ class OllamaClient:
             bool: True if model is available, False otherwise
         """
         try:
-            response = requests.get(f"{self.host}/api/tags", timeout=10)
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            available_models = [m.get("name", "") for m in models]
+            result = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
 
-            is_available = any(self.model in model for model in available_models)
+            if result.returncode != 0:
+                logger.error(f"Failed to list models: {result.stderr}")
+                return False
+
+            # Check if model name appears in the output
+            is_available = self.model in result.stdout
 
             if is_available:
                 logger.info(f"Model {self.model} is available")
             else:
-                logger.warning(f"Model {self.model} not found. Available models: {available_models}")
+                logger.warning(f"Model {self.model} not found in available models")
+                logger.debug(f"Available models:\n{result.stdout}")
 
             return is_available
+
+        except subprocess.TimeoutExpired:
+            logger.error("Timeout while checking model availability")
+            return False
+        except FileNotFoundError:
+            logger.error("Ollama command not found. Please ensure Ollama is installed and in PATH")
+            return False
         except Exception as e:
             logger.error(f"Error checking model availability: {e}")
             return False
 
-    def generate(self, prompt: str, stream: bool = False) -> Optional[str]:
+    def generate(self, prompt: str) -> Optional[str]:
         """
-        Generate text using the Ollama model
+        Generate text using the Ollama model via command line
 
         Args:
             prompt: Input prompt for generation
-            stream: Whether to stream the response
 
         Returns:
             Generated text or None if error occurs
         """
         try:
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": stream,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                }
-            }
+            logger.info(f"Running ollama {self.model} command...")
+            logger.debug(f"Prompt length: {len(prompt)} characters")
 
-            logger.info(f"Sending generation request to Ollama...")
-
-            response = requests.post(
-                self.api_url,
-                json=payload,
+            # Run ollama with the prompt via stdin
+            result = subprocess.run(
+                ["ollama", "run", self.model],
+                input=prompt,
+                capture_output=True,
+                text=True,
                 timeout=self.timeout,
-                stream=stream
+                encoding='utf-8',
+                errors='replace'
             )
-            response.raise_for_status()
 
-            if stream:
-                # Handle streaming response
-                full_response = ""
-                for line in response.iter_lines():
-                    if line:
-                        chunk = json.loads(line)
-                        if "response" in chunk:
-                            full_response += chunk["response"]
-                        if chunk.get("done", False):
-                            break
-                return full_response
-            else:
-                # Handle non-streaming response
-                result = response.json()
-                return result.get("response", "")
+            if result.returncode != 0:
+                logger.error(f"Ollama command failed: {result.stderr}")
+                return None
 
-        except requests.exceptions.Timeout:
+            response = result.stdout.strip()
+            logger.info(f"Received response ({len(response)} characters)")
+            logger.debug(f"Response preview: {response[:500]}...")
+
+            return response
+
+        except subprocess.TimeoutExpired:
             logger.error(f"Request timed out after {self.timeout} seconds")
             return None
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request error: {e}")
-            return None
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
+        except FileNotFoundError:
+            logger.error("Ollama command not found. Please ensure Ollama is installed and in PATH")
             return None
         except Exception as e:
             logger.error(f"Unexpected error during generation: {e}")
@@ -127,20 +124,39 @@ class OllamaClient:
             Parsed JSON dict or None if parsing fails
         """
         try:
+            # Remove thinking tags if present (deepseek-r1 uses <think>...</think>)
+            cleaned = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            cleaned = cleaned.strip()
+
             # Try to find JSON block in response
-            if "```json" in response:
+            if "```json" in cleaned:
                 # Extract content between ```json and ```
-                start = response.find("```json") + 7
-                end = response.find("```", start)
-                json_str = response[start:end].strip()
-            elif "```" in response:
+                start = cleaned.find("```json") + 7
+                end = cleaned.find("```", start)
+                json_str = cleaned[start:end].strip()
+            elif "```" in cleaned:
                 # Extract content between ``` and ```
-                start = response.find("```") + 3
-                end = response.find("```", start)
-                json_str = response[start:end].strip()
+                start = cleaned.find("```") + 3
+                end = cleaned.find("```", start)
+                json_str = cleaned[start:end].strip()
             else:
-                # Assume entire response is JSON
-                json_str = response.strip()
+                # Try to find JSON object directly
+                # Look for { and find the matching }
+                brace_start = cleaned.find("{")
+                if brace_start != -1:
+                    brace_count = 0
+                    brace_end = brace_start
+                    for i, char in enumerate(cleaned[brace_start:], brace_start):
+                        if char == '{':
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                brace_end = i + 1
+                                break
+                    json_str = cleaned[brace_start:brace_end]
+                else:
+                    json_str = cleaned
 
             # Parse JSON
             parsed = json.loads(json_str)
@@ -149,7 +165,7 @@ class OllamaClient:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from response: {e}")
-            logger.debug(f"Response content: {response[:500]}...")
+            logger.debug(f"Response content: {response[:1000]}...")
             return None
         except Exception as e:
             logger.error(f"Unexpected error extracting JSON: {e}")

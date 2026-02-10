@@ -19,24 +19,19 @@ class MentalHealthDataGenerator:
 
     def __init__(
         self,
-        ollama_host: str = None,
         model: str = None,
-        input_file: Path = None,
         output_file: Path = None
     ):
         """
         Initialize data generator
 
         Args:
-            ollama_host: Ollama server host
             model: Model name to use
-            input_file: Path to input JSON with examples
             output_file: Path to save generated output
         """
-        self.ollama_client = OllamaClient(host=ollama_host, model=model)
+        self.ollama_client = OllamaClient(model=model)
         self.prompt_builder = PromptBuilder()
         self.output_handler = OutputHandler(output_path=output_file or config.OUTPUT_JSON)
-        self.input_file = input_file or config.INPUT_JSON
 
         logger.info("Initialized MentalHealthDataGenerator")
 
@@ -55,76 +50,43 @@ class MentalHealthDataGenerator:
             logger.info("Please install it using: ollama pull deepseek-r1")
             return False
 
-        # Check if input file exists
-        if not self.input_file.exists():
-            logger.error(f"Input file not found: {self.input_file}")
-            return False
-
         logger.info("All prerequisites met")
         return True
 
-    def load_example_data(self) -> Optional[Dict[str, List[str]]]:
-        """
-        Load example data from input file
-
-        Returns:
-            Dictionary of category -> example sentences, or None if error
-        """
-        logger.info(f"Loading example data from {self.input_file}")
-
-        data = self.output_handler.load_json(self.input_file)
-
-        if not data:
-            logger.error("Failed to load example data")
-            return None
-
-        if not self.prompt_builder.validate_example_data(data):
-            logger.error("Example data validation failed")
-            return None
-
-        logger.info(f"Loaded {len(data)} categories with example sentences")
-        return data
-
-    def generate(
+    def generate_for_category(
         self,
+        category: str,
         num_sentences: int = None,
-        categories: List[str] = None,
         max_retries: int = 3
     ) -> Optional[Dict[str, List[str]]]:
         """
-        Generate new mental health sentences
+        Generate sentences for a specific category
 
         Args:
-            num_sentences: Number of sentences to generate per category
-            categories: Specific categories to generate for (None for all)
+            category: Mental health category name
+            num_sentences: Number of sentences to generate
             max_retries: Maximum number of retries on failure
 
         Returns:
-            Dictionary of category -> generated sentences, or None if error
+            Dictionary with category -> generated sentences, or None if error
         """
-        logger.info("Starting sentence generation...")
+        logger.info(f"Generating sentences for category: {category}")
 
-        # Load example data
-        example_data = self.load_example_data()
-        if not example_data:
+        # Validate category
+        if not self.prompt_builder.validate_category(category):
             return None
 
-        # Build prompt
+        # Build static prompt for this category
         prompt = self.prompt_builder.build_prompt(
-            example_data=example_data,
-            num_sentences=num_sentences,
-            categories=categories
+            category=category,
+            num_sentences=num_sentences
         )
-
-        if not prompt:
-            logger.error("Failed to build prompt")
-            return None
 
         # Generate with retries
         for attempt in range(1, max_retries + 1):
-            logger.info(f"Generation attempt {attempt}/{max_retries}")
+            logger.info(f"Generation attempt {attempt}/{max_retries} for {category}")
 
-            # Call Ollama model
+            # Call Ollama model via command line
             response = self.ollama_client.generate(prompt)
 
             if not response:
@@ -144,11 +106,65 @@ class MentalHealthDataGenerator:
                 logger.error(f"Generation attempt {attempt} failed: Invalid data structure")
                 continue
 
-            logger.info(f"Successfully generated data on attempt {attempt}")
+            # Ensure the category key matches what we asked for
+            if category not in generated_data:
+                # Try to find a similar key and rename it
+                if len(generated_data) == 1:
+                    old_key = list(generated_data.keys())[0]
+                    generated_data[category] = generated_data.pop(old_key)
+                    logger.info(f"Renamed key '{old_key}' to '{category}'")
+                else:
+                    logger.error(f"Expected category '{category}' not found in response")
+                    continue
+
+            logger.info(f"Successfully generated {len(generated_data[category])} sentences for {category}")
             return generated_data
 
-        logger.error(f"Failed to generate data after {max_retries} attempts")
+        logger.error(f"Failed to generate data for {category} after {max_retries} attempts")
         return None
+
+    def generate(
+        self,
+        num_sentences: int = None,
+        categories: List[str] = None,
+        max_retries: int = 3
+    ) -> Optional[Dict[str, List[str]]]:
+        """
+        Generate new mental health sentences for one or more categories
+
+        Args:
+            num_sentences: Number of sentences to generate per category
+            categories: Specific categories to generate for (None for all)
+            max_retries: Maximum number of retries on failure
+
+        Returns:
+            Dictionary of category -> generated sentences, or None if error
+        """
+        logger.info("Starting sentence generation...")
+
+        # Determine which categories to generate
+        if categories is None:
+            categories = config.CATEGORIES
+
+        all_generated = {}
+
+        for category in categories:
+            result = self.generate_for_category(
+                category=category,
+                num_sentences=num_sentences,
+                max_retries=max_retries
+            )
+
+            if result:
+                all_generated.update(result)
+            else:
+                logger.warning(f"Skipping category {category} due to generation failure")
+
+        if not all_generated:
+            logger.error("Failed to generate any data")
+            return None
+
+        return all_generated
 
     def generate_and_save(
         self,
@@ -214,51 +230,3 @@ class MentalHealthDataGenerator:
             logger.error("Failed to save generated data")
 
         return success
-
-    def generate_for_category(
-        self,
-        category: str,
-        num_sentences: int = None
-    ) -> Optional[List[str]]:
-        """
-        Generate sentences for a specific category
-
-        Args:
-            category: Mental health category name
-            num_sentences: Number of sentences to generate
-
-        Returns:
-            List of generated sentences, or None if error
-        """
-        logger.info(f"Generating sentences for category: {category}")
-
-        # Load example data
-        example_data = self.load_example_data()
-        if not example_data:
-            return None
-
-        if category not in example_data:
-            logger.error(f"Category '{category}' not found in example data")
-            logger.info(f"Available categories: {list(example_data.keys())}")
-            return None
-
-        # Build category-specific prompt
-        prompt = self.prompt_builder.build_category_specific_prompt(
-            category=category,
-            examples=example_data[category],
-            num_sentences=num_sentences
-        )
-
-        # Generate
-        response = self.ollama_client.generate(prompt)
-        if not response:
-            logger.error("Generation failed")
-            return None
-
-        # Extract and return sentences
-        generated_data = self.ollama_client.extract_json_from_response(response)
-        if not generated_data or category not in generated_data:
-            logger.error("Failed to extract category data from response")
-            return None
-
-        return generated_data[category]

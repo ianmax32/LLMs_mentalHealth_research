@@ -31,7 +31,8 @@ class ModelConfig:
     """Model configuration"""
 
     # Model selection
-    model_name: str = "meta-llama/Llama-3.2-1B"  # or "meta-llama/Llama-2-7b-hf"
+    model_name: str = "meta-llama/Llama-3.2-1B"  # HuggingFace model name or local path
+    local_model_path: Optional[str] = None  # Path to local model directory (overrides model_name)
     use_pretrained: bool = True
     num_labels: int = NUM_LABELS
 
